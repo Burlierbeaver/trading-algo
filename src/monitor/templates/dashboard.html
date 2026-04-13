@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block content %}
+<section id="engine-banner"
+         class="banner {% if snapshot.engine.halted %}halted{% elif snapshot.engine.stale %}stale{% else %}running{% endif %}">
+    <div class="banner-label">ENGINE</div>
+    <div class="banner-state" id="engine-state">
+        {% if snapshot.engine.halted %}HALTED{% elif snapshot.engine.stale %}STALE{% else %}RUNNING{% endif %}
+    </div>
+    <div class="banner-heartbeat">
+        heartbeat:
+        <span id="heartbeat-age">
+        {% if snapshot.engine.heartbeat_age_seconds is not none %}
+            {{ "%.1f"|format(snapshot.engine.heartbeat_age_seconds) }}s ago
+        {% else %}
+            n/a
+        {% endif %}
+        </span>
+    </div>
+    <div class="banner-controls">
+        <button id="btn-halt" class="btn btn-danger"
+                {% if snapshot.engine.halted %}disabled{% endif %}>HALT</button>
+        <button id="btn-resume" class="btn btn-primary"
+                {% if not snapshot.engine.halted %}disabled{% endif %}>RESUME</button>
+    </div>
+</section>
+
+<section class="cards">
+    <div class="card">
+        <h2>Live P&amp;L</h2>
+        <dl id="pnl-block">
+            {% if snapshot.live_pnl %}
+            <dt>Equity</dt><dd id="pnl-equity">{{ snapshot.live_pnl.equity }}</dd>
+            <dt>Cash</dt><dd id="pnl-cash">{{ snapshot.live_pnl.cash }}</dd>
+            <dt>Daily</dt><dd id="pnl-daily"
+                    class="{% if snapshot.live_pnl.daily_pnl < 0 %}neg{% else %}pos{% endif %}">
+                    {{ snapshot.live_pnl.daily_pnl }}</dd>
+            <dt>Unrealized</dt><dd id="pnl-unreal">{{ snapshot.live_pnl.unrealized_pnl }}</dd>
+            <dt>Realized</dt><dd id="pnl-real">{{ snapshot.live_pnl.realized_pnl }}</dd>
+            {% else %}
+            <dt>Equity</dt><dd id="pnl-equity">—</dd>
+            <dt>Cash</dt><dd id="pnl-cash">—</dd>
+            <dt>Daily</dt><dd id="pnl-daily">—</dd>
+            <dt>Unrealized</dt><dd id="pnl-unreal">—</dd>
+            <dt>Realized</dt><dd id="pnl-real">—</dd>
+            {% endif %}
+        </dl>
+    </div>
+
+    <div class="card card-wide">
+        <h2>Positions</h2>
+        <table id="positions-table">
+            <thead>
+                <tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>Mkt Value</th><th>Unrealized</th></tr>
+            </thead>
+            <tbody id="positions-body">
+                {% for p in snapshot.positions %}
+                <tr>
+                    <td>{{ p.symbol }}</td>
+                    <td>{{ p.quantity }}</td>
+                    <td>{{ p.avg_price }}</td>
+                    <td>{{ p.market_value if p.market_value is not none else "—" }}</td>
+                    <td class="{% if p.unrealized_pnl and p.unrealized_pnl < 0 %}neg{% else %}pos{% endif %}">
+                        {{ p.unrealized_pnl if p.unrealized_pnl is not none else "—" }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="muted">No open positions</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card card-wide">
+        <h2>Recent Alerts</h2>
+        <ul id="alerts-list" class="alerts">
+            {% for a in snapshot.recent_alerts %}
+            <li class="alert alert-{{ a.severity }}">
+                <span class="alert-time">{{ a.created_at.strftime("%H:%M:%S") if a.created_at else "" }}</span>
+                <span class="alert-severity">{{ a.severity.upper() }}</span>
+                <span class="alert-title">{{ a.title }}</span>
+                {% if a.detail %}<span class="alert-detail">{{ a.detail }}</span>{% endif %}
+                <span class="alert-source">{{ a.source }}</span>
+            </li>
+            {% else %}
+            <li class="muted">No recent alerts</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="card card-wide">
+        <h2>Recent Trades</h2>
+        <table id="trades-table">
+            <thead>
+                <tr><th>Time</th><th>Sym</th><th>Side</th><th>Qty</th><th>Price</th><th>P&amp;L</th></tr>
+            </thead>
+            <tbody id="trades-body">
+                {% for t in snapshot.recent_trades %}
+                <tr>
+                    <td>{{ t.executed_at.strftime("%H:%M:%S") }}</td>
+                    <td>{{ t.symbol }}</td>
+                    <td class="{{ t.side }}">{{ t.side }}</td>
+                    <td>{{ t.quantity }}</td>
+                    <td>{{ t.price }}</td>
+                    <td>{{ t.pnl if t.pnl is not none else "—" }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="muted">No recent trades</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
