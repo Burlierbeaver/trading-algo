@@ -74,7 +74,7 @@ infra-down:
 	docker compose down
 
 init-db: install
-	$(PY) -c "from trading_algo.bridges.strategy_engine import PostgresIntentStore; PostgresIntentStore('$(DB_DSN)').init_schema(); print('schema ok')"
+	$(PY) -c "from trading_algo.bridges.strategy_engine import PostgresIntentStore; from trading_algo.killswitch import PostgresKillSwitch; from trading_algo.audit import PostgresAuditLog; PostgresIntentStore('$(DB_DSN)').init_schema(); PostgresKillSwitch('$(DB_DSN)').init_schema(); PostgresAuditLog('$(DB_DSN)').init_schema(); print('schema ok')"
 
 monitor: install
 	$(VENV)/bin/trading-monitor

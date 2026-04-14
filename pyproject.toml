@@ -9,6 +9,7 @@ description = "Integrated trading-algo system: glues NLP signals, strategy, risk
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.6",
+    "pandas_market_calendars>=4.4",
 ]
 
 [project.optional-dependencies]
