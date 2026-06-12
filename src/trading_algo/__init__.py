@@ -26,6 +26,7 @@ from trading_algo.bridges import (
     InMemoryIntentStore,
     IntentStore,
     PostgresIntentStore,
+    RobinhoodMCPBroker,
     StrategyEngineBridge,
     intent_to_order_request,
 )
@@ -71,6 +72,7 @@ __all__ = [
     "PostgresAuditLog",
     "PostgresIntentStore",
     "PostgresKillSwitch",
+    "RobinhoodMCPBroker",
     "Session",
     "Severity",
     "SlackAlerter",

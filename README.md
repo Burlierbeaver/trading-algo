@@ -28,7 +28,7 @@ languages (the strategy engine is TypeScript) compose cleanly.
 | NLP | [`nlp-signal-processing-for-market-events`](../../tree/nlp-signal-processing-for-market-events) | LLM extracts `Signal` (ticker, event type, score) from each event |
 | Strategy | [`strategy-engine-trade-signal-processing`](../../tree/strategy-engine-trade-signal-processing) | `Signal` → `TradeIntent`. The swappable alpha. TypeScript. |
 | Risk | [`risk-management-system-architecture`](../../tree/risk-management-system-architecture) | Position caps, sector exposure, daily loss limit, kill switch |
-| Broker | [`alpaca-broker-adapter-order-execution-and-fill-rec`](../../tree/alpaca-broker-adapter-order-execution-and-fill-rec) | Submits orders to Alpaca, reconciles fills to Postgres |
+| Broker | [`alpaca-broker-adapter-order-execution-and-fill-rec`](../../tree/alpaca-broker-adapter-order-execution-and-fill-rec) | Submits orders to Alpaca, reconciles fills to Postgres. A [Robinhood MCP](#robinhood-broker-mcp) alternative lives on `main`. |
 | Backtester | [`backtester-and-paper-trading-historical-replay-val`](../../tree/backtester-and-paper-trading-historical-replay-val) | Historical replay + paper trading harness |
 | Dashboard | [`fastapi-dashboard-for-live-trading-monitoring-and`](../../tree/fastapi-dashboard-for-live-trading-monitoring-and) | FastAPI live monitor with kill switch + alerting |
 | Integration | `main` (this branch) | Glues it all into a single runnable pipeline |
@@ -68,6 +68,38 @@ event=demo-1
 | `make monitor` | Boot the FastAPI dashboard (requires infra-up) |
 | `make strategy-ts` | Build the TypeScript strategy engine |
 | `make clean` | Wipe venv + build artifacts |
+
+## Robinhood broker (MCP)
+
+Robinhood's [Agentic Trading](https://robinhood.com/us/en/support/articles/agentic-trading-overview/)
+beta exposes an MCP server at `https://agent.robinhood.com/mcp/trading`.
+`RobinhoodMCPBroker` wraps it behind the same `execute_order` seam the
+Alpaca adapter uses, so it drops straight into `Pipeline(..., broker=...)`,
+and it also serves the risk manager's read-only quote/cash/positions
+surface (`broker.as_risk_bridge()`).
+
+```python
+from trading_algo import Pipeline, RobinhoodMCPBroker
+
+broker = RobinhoodMCPBroker(token="...", allow_orders=True)
+pipeline = Pipeline(nlp=nlp, risk=risk, broker=broker)
+```
+
+Notes:
+
+- **Orders are off by default.** `execute_order` raises `OrdersDisabled`
+  unless you pass `allow_orders=True` or set `ROBINHOOD_MCP_ALLOW_ORDERS=1`.
+  Read-only calls (quote, positions, buying power) always work. The risk
+  engine and kill switch still gate everything upstream.
+- Auth is a bearer token via `token=` or the `ROBINHOOD_MCP_TOKEN` env var.
+- The beta's tool schema isn't frozen, so nothing is hardcoded: the broker
+  discovers tools via `tools/list`, resolves capabilities by keyword, and
+  adapts argument names to each tool's `inputSchema`. Run
+  `trading-algo robinhood-tools` to see what the server offers and how it
+  resolved; pass `tool_map={"place_order": "exact_tool_name", ...}` to pin
+  names if discovery guesses wrong.
+- `.mcp.json` in the repo root also registers the server as a Claude Code
+  connector, for interactive use alongside the pipeline.
 
 ## Architecture
 
@@ -111,6 +143,7 @@ src/trading_algo/
 ├── cli.py               trading-algo { demo | backtest | run }
 └── bridges/
     ├── broker.py        intent → OrderRequest + BrokerBridge
+    ├── robinhood_mcp.py     Robinhood Agentic Trading MCP broker
     └── strategy_engine.py   Postgres IntentStore for the TS engine
 
 tests/                   18 tests covering every seam
@@ -124,7 +157,7 @@ Makefile                 All build / run / infra commands
 from trading_algo import (
     Pipeline, PipelineResult,
     DefaultStrategy, Strategy, StrategyConfig,
-    BrokerBridge, intent_to_order_request,
+    BrokerBridge, RobinhoodMCPBroker, intent_to_order_request,
     IngestionSource, JSONLIngestion, ListIngestion, stdin_ingestion,
     StrategyEngineBridge, IntentStore, InMemoryIntentStore, PostgresIntentStore,
     run_backtest, BacktestResult,

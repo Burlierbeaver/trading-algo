@@ -78,6 +78,25 @@ def _run_backtest_cmd() -> int:
     return 0
 
 
+def _run_robinhood_tools(url: str) -> int:
+    from trading_algo.bridges.robinhood_mcp import TOKEN_ENV, MCPError, RobinhoodMCPBroker
+
+    broker = RobinhoodMCPBroker(url)
+    try:
+        tools = broker.tools()
+    except MCPError as exc:
+        print(f"error: {exc}")
+        print(f"(is {TOKEN_ENV} set, and the host reachable from this network?)")
+        return 1
+    print(f"{len(tools)} tools discovered at {url}:")
+    for tool in tools:
+        print(f"  {tool.get('name')}  — {tool.get('description', '').strip().splitlines()[0] if tool.get('description') else ''}")
+    print("\ncapability resolution:")
+    for capability, name in sorted(broker.resolved_tools().items()):
+        print(f"  {capability:14s} -> {name}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="trading-algo")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -86,6 +105,14 @@ def main() -> int:
     sub.add_parser("backtest", help="run through the backtester harness")
     run_p = sub.add_parser("run", help="ingest JSONL RawEvents through the pipeline")
     run_p.add_argument("--events", required=True, help="path to JSONL file of RawEvents")
+    rh_p = sub.add_parser(
+        "robinhood-tools", help="list the Robinhood MCP server's tools and how they resolved"
+    )
+    rh_p.add_argument(
+        "--url",
+        default="https://agent.robinhood.com/mcp/trading",
+        help="MCP endpoint (default: Robinhood Agentic Trading)",
+    )
 
     args = parser.parse_args()
     if args.command == "demo":
@@ -94,6 +121,8 @@ def main() -> int:
         return _run_backtest_cmd()
     if args.command == "run":
         return asyncio.run(_run_ingest(args.events))
+    if args.command == "robinhood-tools":
+        return _run_robinhood_tools(args.url)
     return 2
 
 
